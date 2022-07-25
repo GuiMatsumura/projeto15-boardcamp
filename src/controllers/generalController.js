@@ -1,4 +1,5 @@
 import joi from 'joi';
+import dayjs from 'dayjs';
 
 import connection from '../db/postgres.js';
 
@@ -235,6 +236,128 @@ export async function putCustomersId(req, res) {
     }
     res.sendStatus(409);
     return;
+  } catch (err) {
+    res.status(500).send(err);
+  }
+}
+
+export async function getRentals(req, res) {
+  const queryId = req.query;
+  try {
+    if (queryId.customerId) {
+      const { rows: searchCustomerId } = await connection.query(
+        `
+      SELECT rentals.*, 
+      jsonb_build_object('name', customers.name, 'id', customers.id) AS customer,
+      jsonb_build_object('id', games.id, 'name', games.name, 'categoryId', games."categoryId", 'categoryName', categories.name) AS game
+      FROM rentals 
+      JOIN customers ON rentals."customerId" = customers.id
+      JOIN games ON rentals."gameId" = games.id
+      JOIN categories ON categories.id = games."categoryId"
+      WHERE customers.id = $1`,
+        [queryId.customerId]
+      );
+      if (searchCustomerId.length !== 0) {
+        res.status(200).send(searchCustomerId);
+      } else {
+        res.sendStatus(404);
+      }
+    } else if (queryId.gameId) {
+      const { rows: searchGameId } = await connection.query(
+        `
+      SELECT rentals.*, 
+      jsonb_build_object('name', customers.name, 'id', customers.id) AS customer,
+      jsonb_build_object('id', games.id, 'name', games.name, 'categoryId', games."categoryId", 'categoryName', categories.name) AS game
+      FROM rentals 
+      JOIN customers ON rentals."customerId" = customers.id
+      JOIN games ON rentals."gameId" = games.id
+      JOIN categories ON categories.id = games."categoryId"
+      WHERE games.id = $1`,
+        [queryId.gameId]
+      );
+      if (searchGameId.length !== 0) {
+        res.status(200).send(searchGameId);
+      } else {
+        res.sendStatus(404);
+      }
+    } else {
+      const { rows: allRentals } = await connection.query(
+        `
+            SELECT rentals.*, 
+            jsonb_build_object('name', customers.name, 'id', customers.id) AS customer,
+            jsonb_build_object('id', games.id, 'name', games.name, 'categoryId', games."categoryId", 'categoryName', categories.name) AS game
+            FROM rentals 
+            JOIN customers ON rentals."customerId" = customers.id
+            JOIN games ON rentals."gameId" = games.id
+            JOIN categories ON categories.id = games."categoryId"
+        `
+      );
+      if (allRentals.length !== 0) {
+        res.status(200).send(allRentals);
+      } else {
+        res.sendStatus(404);
+      }
+    }
+  } catch (err) {
+    res.status(500).send(err);
+  }
+}
+
+export async function postRentals(req, res) {
+  const rental = req.body;
+  const rentalSchema = joi.object({
+    customerId: joi.number().min(1).required(),
+    gameId: joi.number().min(1).required(),
+    daysRented: joi.number().min(1).required(),
+  });
+  const { error } = rentalSchema.validate(rental);
+  if (error) {
+    res.sendStatus(400);
+    return;
+  }
+  try {
+    const { rows: game } = await connection.query(
+      'SELECT * FROM games WHERE id = $1',
+      [rental.gameId]
+    );
+    if (game.length === 0) {
+      res.sendStatus(400);
+      return;
+    }
+
+    const { rows: customer } = await connection.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [rental.customerId]
+    );
+    if (customer === 0) {
+      res.sendStatus(400);
+      return;
+    }
+
+    const { rows: stock } = await connection.query(
+      'SELECT "stockTotal" FROM games WHERE id = $1',
+      [rental.gameId]
+    );
+    if (stock[0].stockTotal < 1) {
+      res.sendStatus(400);
+      return;
+    }
+
+    const price = rental.daysRented * game[0].pricePerDay;
+
+    await connection.query(
+      'INSERT INTO rentals ("customerId", "gameId", "rentDate", "daysRented", "returnDate", "originalPrice", "delayFee") VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [
+        rental.customerId,
+        rental.gameId,
+        dayjs().format('YYYY-MM-DD'),
+        rental.daysRented,
+        null,
+        price,
+        null,
+      ]
+    );
+    res.sendStatus(201);
   } catch (err) {
     res.status(500).send(err);
   }

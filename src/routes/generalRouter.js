@@ -8,6 +8,8 @@ import {
   getCustomersId,
   postCustomers,
   putCustomersId,
+  getRentals,
+  postRentals,
 } from '../controllers/generalController.js';
 
 const router = Router();
@@ -20,5 +22,7 @@ router.get('/customers', getCustomers);
 router.get('/customers/:id', getCustomersId);
 router.post('/customers', postCustomers);
 router.put('/customers/:id', putCustomersId);
+router.get('/rentals', getRentals);
+router.post('/rentals', postRentals);
 
 export default router;
