@@ -156,10 +156,85 @@ export async function getCustomersId(req, res) {
       [id.id]
     );
     if (customerSearch.length === 0) {
-      res.sendStatus(404);
+      res.status(404).send('deu ruim');
       return;
     }
-    res.status(200).send(customerSearch);
+    res.status(200).send(customerSearch[0]);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+}
+
+export async function postCustomers(req, res) {
+  const customer = req.body;
+  // Front-end birthday format YYYY-MM-DD
+  const customerSchema = joi.object({
+    name: joi.string().min(1).required(),
+    phone: joi.string().min(10).max(11).required().pattern(/[0-9]/),
+    cpf: joi.string().length(11).required().pattern(/[0-9]/),
+    birthday: joi.required(),
+  });
+  const { error } = customerSchema.validate(customer);
+  if (error) {
+    res.status(400).send('Dados inválidos.');
+  }
+  const x = customer.birthday.split('');
+  console.log(x);
+  try {
+    const { rows: searchCpf } = await connection.query(
+      'SELECT * FROM customers WHERE cpf = $1',
+      [customer.cpf]
+    );
+    if (searchCpf.length !== 0) {
+      res.sendStatus(409);
+      return;
+    }
+    await connection.query(
+      'INSERT INTO customers (name, phone, cpf, birthday) VALUES ($1, $2, $3, $4)',
+      [customer.name, customer.phone, customer.cpf, customer.birthday]
+    );
+    res.sendStatus(201);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+}
+
+export async function putCustomersId(req, res) {
+  const customer = req.body;
+  const customerId = req.params;
+  // Front-end birthday format YYYY-MM-DD
+  const editSchema = joi.object({
+    name: joi.string().min(1).required(),
+    phone: joi.string().min(10).max(11).required().pattern(/[0-9]/),
+    cpf: joi.string().length(11).required().pattern(/[0-9]/),
+    birthday: joi.required(),
+  });
+  const { error } = editSchema.validate(customer);
+  if (error) {
+    res.sendStatus(400);
+    return;
+  }
+  try {
+    const { rows: searchCpf } = await connection.query(
+      'SELECT * FROM customers WHERE cpf = $1',
+      [customer.cpf]
+    );
+    if (searchCpf.length !== 0) {
+      await connection.query(
+        'UPDATE customers SET name=$1, phone=$2, cpf=$3, birthday=$4 WHERE id=$5',
+        [
+          customer.name,
+          customer.phone,
+          customer.cpf,
+          customer.birthday,
+          customerId.id,
+        ]
+      );
+      res.sendStatus(200);
+      return;
+    }
+    res.sendStatus(409);
+    return;
   } catch (err) {
     res.status(500).send(err);
   }
