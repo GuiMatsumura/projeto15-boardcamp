@@ -63,10 +63,10 @@ export async function getGames(req, res) {
       }
     } else {
       const { rows: y } = await connection.query(`
-        SELECT games.*, categories.name AS "categoryName"
-        FROM games JOIN categories
-        ON games."categoryId" = categories.id`);
-      res.status().send(y);
+         SELECT games.*, categories.name AS "categoryName"
+         FROM games JOIN categories
+         ON games."categoryId" = categories.id`);
+      res.status(200).send(y);
     }
   } catch (err) {
     res.status(500).send(err);
@@ -122,5 +122,45 @@ export async function postGames(req, res) {
     res.status(201).send('Jogo cadastrado com sucesso!');
   } catch (err) {
     res.status(500).send('err');
+  }
+}
+
+export async function getCustomers(req, res) {
+  const customer = req.query;
+  try {
+    if (customer.cpf) {
+      const { rows: customerSearch } = await connection.query(
+        'SELECT * FROM customers WHERE cpf LIKE $1',
+        [customer.cpf + '%']
+      );
+      if (customerSearch.length === 0) {
+        res.status(404).send('Nenhum cliente encontrado.');
+        return;
+      }
+    } else {
+      const { rows: customerFind } = await connection.query(
+        'SELECT * FROM customers'
+      );
+      res.status(200).send(customerFind);
+    }
+  } catch (err) {
+    res.status(500).send(err);
+  }
+}
+
+export async function getCustomersId(req, res) {
+  const id = req.params;
+  try {
+    const { rows: customerSearch } = await connection.query(
+      'SELECT * FROM customers WHERE id = $1',
+      [id.id]
+    );
+    if (customerSearch.length === 0) {
+      res.sendStatus(404);
+      return;
+    }
+    res.status(200).send(customerSearch);
+  } catch (err) {
+    res.status(500).send(err);
   }
 }
