@@ -34,7 +34,93 @@ export async function postCategories(req, res) {
       newCategory.name,
     ]);
     res.status(201).send('Categoria criada com sucesso!');
-  } catch {
-    res.status(500).send('Ocorreu um erro. Por favor, tente novamente!');
+  } catch (err) {
+    res.status(500).send(err);
+  }
+}
+
+export async function getGames(req, res) {
+  const game = req.query;
+  try {
+    if (game.name) {
+      const { rows: gameSearch } = await connection.query(
+        'SELECT * FROM games WHERE name ILIKE $1',
+        [game.name + '%']
+      );
+      if (gameSearch.length === 0) {
+        res.status(404).send('Nenhum jogo encontrado');
+        return;
+      } else {
+        const { rows: gameFind } = await connection.query(
+          `
+        SELECT games.*, categories.name AS "categoryName"
+        FROM games JOIN categories
+        ON games."categoryId" = categories.id
+        WHERE games.name ILIKE $1`,
+          [game.name + '%']
+        );
+        res.status(200).send(gameFind);
+      }
+    } else {
+      const { rows: y } = await connection.query(`
+        SELECT games.*, categories.name AS "categoryName"
+        FROM games JOIN categories
+        ON games."categoryId" = categories.id`);
+      res.status().send(y);
+    }
+  } catch (err) {
+    res.status(500).send(err);
+  }
+}
+
+export async function postGames(req, res) {
+  const game = req.body;
+  const gameSchema = joi.object({
+    name: joi.string().min(1).required(),
+    image: joi.string().required(),
+    stockTotal: joi.number().min(1).required(),
+    categoryId: joi.number().min(1).required(),
+    pricePerDay: joi.number().min(1).required(),
+  });
+  const { error } = gameSchema.validate(game);
+  if (error) {
+    res
+      .status(400)
+      .send('Por favor, preencha os campos com informações válidas.');
+    return;
+  }
+  try {
+    const { rows: gameSearch } = await connection.query(
+      'SELECT * FROM games WHERE name = $1',
+      [game.name]
+    );
+    const { rows: categorySearch } = await connection.query(
+      'SELECT * FROM categories WHERE id = $1',
+      [game.categoryId]
+    );
+    if (gameSearch.length !== 0) {
+      res.status(409).send('Este jogo já existe.');
+      return;
+    } else if (categorySearch.length === 0) {
+      res
+        .status(400)
+        .send(
+          'O jogo não pode ser inserido numa categoria que não existe ainda!'
+        );
+      return;
+    }
+    await connection.query(
+      'INSERT INTO games (name, image, "stockTotal", "categoryId", "pricePerDay") VALUES ($1, $2, $3, $4, $5)',
+      [
+        game.name,
+        game.image,
+        game.stockTotal,
+        game.categoryId,
+        game.pricePerDay,
+      ]
+    );
+    res.status(201).send('Jogo cadastrado com sucesso!');
+  } catch (err) {
+    res.status(500).send('err');
   }
 }
