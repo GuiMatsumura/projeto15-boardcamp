@@ -10,6 +10,8 @@ import {
   putCustomersId,
   getRentals,
   postRentals,
+  postReturnRental,
+  deleteRental,
 } from '../controllers/generalController.js';
 
 const router = Router();
@@ -24,5 +26,7 @@ router.post('/customers', postCustomers);
 router.put('/customers/:id', putCustomersId);
 router.get('/rentals', getRentals);
 router.post('/rentals', postRentals);
+router.post('/rentals/:id/return', postReturnRental);
+router.delete('/rentals/:id', deleteRental);
 
 export default router;

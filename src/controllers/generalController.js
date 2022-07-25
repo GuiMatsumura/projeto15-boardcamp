@@ -292,11 +292,7 @@ export async function getRentals(req, res) {
             JOIN categories ON categories.id = games."categoryId"
         `
       );
-      if (allRentals.length !== 0) {
-        res.status(200).send(allRentals);
-      } else {
-        res.sendStatus(404);
-      }
+      res.status(200).send(allRentals);
     }
   } catch (err) {
     res.status(500).send(err);
@@ -358,6 +354,58 @@ export async function postRentals(req, res) {
       ]
     );
     res.sendStatus(201);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+}
+
+export async function postReturnRental(req, res) {
+  const gameId = req.params;
+  try {
+    const { rows: gameRental } = await connection.query(
+      'SELECT * FROM rentals WHERE id = $1',
+      [gameId.id]
+    );
+    if (gameRental.length === 0) {
+      res.sendStatus(404);
+      return;
+    } else if (gameRental[0].returnDate) {
+      res.sendStatus(400);
+      return;
+    }
+    const rentalDiff = dayjs().diff(gameRental[0].rentDate, 'day');
+    const delayFee =
+      rentalDiff > gameRental[0].daysRented
+        ? (rentalDiff - gameRental[0].daysRented) *
+          (gameRental[0].originalPrice / gameRental[0].daysRented)
+        : 0;
+    await connection.query(
+      'UPDATE rentals SET "returnDate" = $1, "delayFee" = $2 WHERE id = $3',
+      [dayjs().format('YYYY-MM-DD'), delayFee, gameId.id]
+    );
+    res.sendStatus(200);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+}
+
+export async function deleteRental(req, res) {
+  const rentalId = req.params;
+
+  try {
+    const { rows: searchRental } = await connection.query(
+      'SELECT * FROM rentals WHERE id = $1',
+      [rentalId.id]
+    );
+    if (searchRental.length === 0) {
+      res.sendStatus(404);
+      return;
+    } else if (searchRental[0].returnDate) {
+      res.sendStatus(400);
+      return;
+    }
+    await connection.query('DELETE FROM rentals WHERE id = $1', [rentalId.id]);
+    res.sendStatus(200);
   } catch (err) {
     res.status(500).send(err);
   }
